@@ -51,30 +51,30 @@ class LoggerConfig:
 def _get_config_path() -> ConfigPathResult:
     """
     Locates the worker_config.json file using a prioritized multi-tier lookup 
-    hierarchy. (1) first check the BOA_PY_CONFIG environment variable. 
+    hierarchy. (1) first check the BOA_CONFIG_PATH environment variable. 
     if that is not available then $HOME/sw/.softmaxx/boa is checked next, followed by 
     /usr/local/etc/softmaxx/boa and /etc/softmaxx/boa folders. 
     Checks the environment variable first, then system fallback locations.
     """
     log_stream = io.StringIO()
-    target_filename = "config.json"
+    target_filename = "boa_config.json"
     
     try:
         # is environment variable set?
-        env_path_str = os.environ.get("BOA_PY_CONFIG")
+        env_path_str = os.environ.get("BOA_CONFIG_PATH")
         if env_path_str:
             env_path = Path(env_path_str).resolve()
-            log_stream.write("BOA_PY_CONFIG=[{0}]\n".format(env_path))
+            log_stream.write("BOA_CONFIG_PATH=[{0}]\n".format(env_path))
             
             if env_path.exists() and env_path.is_file():
-                log_stream.write("BOA_PY_CONFIG is set and file exists.\n")
+                log_stream.write("BOA_CONFIG_PATH is set and file exists.\n")
                 return ConfigPathResult(
                     ConfigPathCode.SUCCESS, 
                     env_path, 
                     log_stream.getvalue()
                 )
             else:
-                log_stream.write("BOA_PY_CONFIG is not set or points to a bad location\n")
+                log_stream.write("BOA_CONFIG_PATH is not set or points to a bad location\n")
                 
         log_stream.write("no config found via environment. checking system paths...\n")
         # search system paths for config file
