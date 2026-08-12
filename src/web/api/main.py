@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from config import AppConfig
-from config import get_database_config, get_logger_config
+from config import get_logger_config
 from .routers.llm import llm_router
 
 
@@ -30,8 +30,8 @@ def write_hello_world():
 
 @app.get("/debug")
 def get_debug_info():
-    db_config = get_database_config() 
+    log_config = get_logger_config("global")
     return {
-        "host": db_config.db_host,
-        "database": db_config.db_name
+        "log_file": log_config.log_file,
+        "log_level": log_config.log_level
     }
