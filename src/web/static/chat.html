@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI LLM Stream Chat</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: #f4f6f8; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .chat-container { width: 100%; max-width: 700px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; display: flex; flex-direction: column; height: 90vh; }
+        h2 { margin-top: 0; color: #333; text-align: center; }
+        .messages { flex: 1; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 6px; padding: 15px; margin-bottom: 15px; background: #fafafa; display: flex; flex-direction: column; gap: 10px; }
+        .message { padding: 10px 14px; border-radius: 6px; max-width: 85%; white-space: pre-wrap; line-height: 1.5; }
+        .user { background: #007bff; color: white; align-self: flex-end; }
+        .bot { background: #e9ecef; color: #212529; align-self: flex-start; }
+        .input-group { display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; outline: none; }
+        button { padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; transition: background 0.2s; }
+        button:disabled { background: #80bdff; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <h2>LLM Chat (FastAPI Stream)</h2>
+    <div id="messages" class="messages"></div>
+    <div class="input-group">
+        <input type="text" id="prompt-input" placeholder="Type a prompt..." value="Explain the Chaos theory." onkeydown="if(event.key==='Enter') sendPrompt()"/>
+        <button id="send-btn" onclick="sendPrompt()">Send</button>
+    </div>
+</div>
+
+<script>
+    async function sendPrompt() {
+        const input = document.getElementById('prompt-input');
+        const sendBtn = document.getElementById('send-btn');
+        const messagesDiv = document.getElementById('messages');
+        const prompt = input.value.trim();
+
+        if (!prompt) return;
+
+        // 1. Append User Message
+        appendMessage(prompt, 'user');
+        input.value = '';
+        input.disabled = true;
+        sendBtn.disabled = true;
+
+        // 2. Create Placeholder Bot Message
+        const botMessageElement = appendMessage('', 'bot');
+
+        try {
+            // 3. Call FastAPI streaming endpoint
+            const response = await fetch(`/llm/qwen3/chat?prompt=${encodeURIComponent(prompt)}`, {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                botMessageElement.innerText = "Error: Failed to connect to server.";
+                return;
+            }
+
+            // 4. Read the SSE Stream
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                // Decode incoming chunk into text
+                buffer += decoder.decode(value, { stream: true });
+
+                // Process complete SSE data events (separated by double newlines)
+                const events = buffer.split('\n\n');
+                buffer = events.pop(); // Keep incomplete event tail in buffer
+
+                for (const event of events) {
+                    if (event.startsWith('data: ')) {
+                        const jsonStr = event.replace('data: ', '').trim();
+                        if (jsonStr === '[DONE]') break;
+
+                        try {
+                            const data = JSON.parse(jsonStr);
+                            if (data.token) {
+                                // Append token to the current bot message in real time
+                                botMessageElement.innerText += data.token;
+                                messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll
+                            }
+                        } catch (e) {
+                            console.error('Error parsing token JSON:', e);
+                        }
+                    }
+                }
+            }
+
+        } catch (error) {
+            botMessageElement.innerText = "Error: " + error.message;
+        } finally {
+            input.disabled = false;
+            sendBtn.disabled = false;
+            input.focus();
+        }
+    }
+
+    function appendMessage(text, className) {
+        const messagesDiv = document.getElementById('messages');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${className}`;
+        msgDiv.innerText = text;
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        return msgDiv;
+    }
+</script>
+
+</body>
+</html>
