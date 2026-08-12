@@ -3,10 +3,21 @@ from fastapi import Response, status, APIRouter
 from fastapi import Request
 from openai import OpenAI
 
+"""
+To forward the port on SSL for testing using VPC bound model key,
+(1) add an entry in /etc/hosts to route inference.do-ai.run to 127.0.0.1 
+
+# Do inference testing
+# 127.0.0.1 inference.do-ai.run
+
+(2) open a port to remote machine,
+sudo ssh -i ~/.ssh/id_rsa -L 443:inference.do-ai.run:443 user@remote-ip
+
+"""
 
 client = OpenAI(
     base_url="https://inference.do-ai.run/v1/",
-    api_key=os.environ.get("QWEN3_32B_KEY"),
+    api_key=os.getenv("QWEN3_32B_KEY")
 )
 
 
