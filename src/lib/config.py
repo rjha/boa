@@ -13,9 +13,6 @@ from typing import Dict, Any, Optional
 # 1. TYPE DECLARATIONS & CONTAINERS (IMMUTABLE RECORDS)
 # ==============================================================================
 
-class DatabaseType(Enum):
-    PRODUCTION = "production"
-    DEV = "dev"
 
 class ConfigPathCode(Enum):
     SUCCESS = 0
@@ -214,18 +211,17 @@ class AppConfig:
         root_logger.addHandler(console_handler)
         logging.info("init_logging() done, writing logs to target file: {0}".format(log_file))
 
-# ==============================================================================
-# 4. MODULE-LEVEL FUNCTIONS
-# ==============================================================================
 
-@lru_cache(maxsize=len(DatabaseType))
-def get_database_config(db_type: DatabaseType=DatabaseType.DEV) -> DatabaseConfig:
+
+def _get_database_config(db_config_key: str) -> DatabaseConfig:
     """
     Extracts a strongly-typed, immutable credential block corresponding 
-    to the DatabaseType Enum selector (PRODUCTION or DEV). Cached.
+    to the Database config key
     """
     database_section = AppConfig.get("database") 
-    data = database_section[db_type.value]
+    data = database_section.get(db_config_key, None)
+    if not data:
+        raise ValueError(f"database config key error: {db_config_key}")
     
     return DatabaseConfig(
         db_user=str(data["user"]),
@@ -234,6 +230,25 @@ def get_database_config(db_type: DatabaseType=DatabaseType.DEV) -> DatabaseConfi
         db_port=int(data["port"]),
         db_name=str(data["database"])
     )
+
+# ==============================================================================
+# 4. MODULE-LEVEL FUNCTIONS
+# ==============================================================================
+
+def get_postgres_conn_string(db_config_key: str="default") -> str:
+    logger = logging.getLogger("main." + __name__)
+    
+    db_config = _get_database_config(db_config_key)
+    DB_URI = "postgresql://{0}:{1}@{2}:{3}/{4}".format(
+        db_config.db_user,
+        db_config.db_password,
+        db_config.db_host,
+        db_config.db_port,
+        db_config.db_name
+    )
+
+    logger.info("database URI -> " + DB_URI)
+    return DB_URI
 
 
 @lru_cache(maxsize=1)
