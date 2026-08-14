@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 import logging 
 from contextlib import asynccontextmanager
@@ -7,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from config import AppConfig
 from config import get_logger_config
 from .routers.llm import llm_router
-
+from .routers.game import game_router
 
 # noinspection PyUnusedLocal
 @asynccontextmanager
@@ -24,6 +23,8 @@ async def lifespan(myapp: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(llm_router)
+app.include_router(game_router)
+
 
 # Path(__file__).resolve().parent points to 'web/api'
 # .parent again points to 'web/'
