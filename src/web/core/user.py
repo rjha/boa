@@ -1,10 +1,10 @@
+import logging
+import json 
 from dataclasses import dataclass
-from typing import Optional
 from uuid import UUID
 import psycopg
 from uuid import UUID
-from typing import List
-import logging
+from typing import List, Dict, Any, Optional
 from config import get_postgres_conn_string
 
 
@@ -150,7 +150,81 @@ def _delete_web_sessions_by_login_name(conn: psycopg.Connection, login_name: str
     with conn.cursor() as cur:
         cur.execute(delete_query, (login_name,))
         return cur.rowcount
-    
+
+def _session_exists(conn: psycopg.Connection, session_uuid: UUID) -> bool:
+    select_query = """
+        SELECT 1 
+        FROM web_session 
+        WHERE session_uuid = %s;
+    """
+    with conn.cursor() as cur:
+        cur.execute(select_query, (session_uuid,))
+        return cur.fetchone() is not None
+
+
+def _upsert_game_state(
+    conn: psycopg.Connection, 
+    session_uuid: UUID, 
+    game_name: str, 
+    game_data: Dict[str, Any]
+) -> int:
+    upsert_query = """
+        INSERT INTO game_state (session_uuid, game_name, game_data)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (session_uuid, game_name)
+        DO UPDATE SET
+            game_data = EXCLUDED.game_data,
+            updated_at = CURRENT_TIMESTAMP
+        RETURNING game_state_id;
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            upsert_query, 
+            (session_uuid, game_name, json.dumps(game_data))
+        )
+        row = cur.fetchone()
+        return row[0]
+
+
+def _fetch_game_state(
+    conn: psycopg.Connection, 
+    session_uuid: UUID, 
+    game_name: str
+) -> Optional[Dict[str, Any]]:
+    select_query = """
+        SELECT session_uuid, game_name, game_data
+        FROM game_state
+        WHERE session_uuid = %s AND game_name = %s;
+    """
+    with conn.cursor() as cur:
+        cur.execute(select_query, (session_uuid, game_name))
+        row = cur.fetchone()
+        if not row:
+            return None
+        
+        return {
+            "session_uuid": row[0],
+            "game_name": row[1],
+            "game_data": row[2],  # psycopg v3 automatically deserializes JSONB to dict
+        }
+
+
+def _clear_word_tracker_rows(
+    conn: psycopg.Connection,
+    session_uuid: UUID,
+    game_name: str,
+    game_level: int
+) -> int:
+    delete_query = """
+        DELETE FROM word_tracker
+        WHERE session_uuid = %s
+          AND game_name = %s
+          AND w_level = %s;
+    """
+    with conn.cursor() as cur:
+        cur.execute(delete_query, (session_uuid, game_name, game_level))
+        return cur.rowcount
+
     
 """
 # #################################
@@ -290,3 +364,89 @@ def clear_session(login_name: str) -> int:
             conn.rollback()
             logger.exception("Database error while clearing sessions for login_name: %s", login_name)
             raise e
+
+
+def save_game_state(session_uuid: UUID, game_name: str, game_data: Dict[str, Any]) -> int:
+    logger = logging.getLogger("main." + __name__)
+    db_conn_string = get_postgres_conn_string()
+    game_state_id = None
+
+    with psycopg.connect(db_conn_string) as conn:
+        try:
+            # 1. Verify that the session exists
+            if not _session_exists(conn, session_uuid):
+                logger.error("Session %s does not exist.", session_uuid)
+                raise ValueError(f"Session with UUID '{session_uuid}' does not exist.")
+
+            # 2. Insert or update game state (UPSERT)
+            game_state_id = _upsert_game_state(conn, session_uuid, game_name, game_data)
+            conn.commit()
+            logger.info("Saved game state %s for session %s and game %s", game_state_id, session_uuid, game_name)
+
+        except Exception as e:
+            conn.rollback()
+            logger.exception("Database error while saving game state for session: %s", session_uuid)
+            raise e
+
+    return game_state_id
+
+
+def get_game_state(session_uuid: UUID, game_name: str) -> Optional[Dict[str, Any]]:
+    logger = logging.getLogger("main." + __name__)
+    db_conn_string = get_postgres_conn_string()
+
+    with psycopg.connect(db_conn_string) as conn:
+        try:
+            # 1. Verify session exists
+            if not _session_exists(conn, session_uuid):
+                logger.error("Session %s not found.", session_uuid)
+                raise ValueError(f"Invalid session_uuid: {session_uuid}")
+
+            # 2. Fetch game state record
+            record = _fetch_game_state(conn, session_uuid, game_name)
+            if record:
+                logger.info("Successfully retrieved game state for session %s, game %s", session_uuid, game_name)
+            else:
+                logger.info("No game state record found for session %s, game %s", session_uuid, game_name)
+                
+            return record
+
+        except Exception as e:
+            logger.exception("Database error while fetching game state for session %s", session_uuid)
+            raise e
+
+
+
+def reset_game_level(session_uuid: UUID, game_name: str, game_level: int) -> int:
+    logger = logging.getLogger("main." + __name__)
+    db_conn_string = get_postgres_conn_string()
+
+    with psycopg.connect(db_conn_string) as conn:
+        try:
+            # 1. Verify session exists
+            if not _session_exists(conn, session_uuid):
+                logger.error("Session %s not found.", session_uuid)
+                raise ValueError(f"Invalid session_uuid: {session_uuid}")
+
+            # 2. Delete word tracker records for level
+            deleted_count = _clear_word_tracker_rows(conn, session_uuid, game_name, game_level)
+            conn.commit()
+
+            logger.info(
+                "Successfully reset level %s progress for session %s, game %s (%d rows deleted).",
+                game_level,
+                session_uuid,
+                game_name,
+                deleted_count,
+            )
+            return deleted_count
+
+        except Exception as e:
+            logger.exception(
+                "Database error while resetting level %s progress for session %s",
+                game_level,
+                session_uuid,
+            )
+            raise e
+
+
