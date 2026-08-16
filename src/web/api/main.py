@@ -11,8 +11,7 @@ from .routers.game import game_router
 
 # noinspection PyUnusedLocal
 @asynccontextmanager
-async def lifespan(myapp: FastAPI):
-
+async def lifespan(boa_app: FastAPI):
     logger = logging.getLogger("boa.fastapi.main." + __name__)
     AppConfig.load()
     log_config = get_logger_config("global")
@@ -23,20 +22,6 @@ async def lifespan(myapp: FastAPI):
     # shutdown events
 
 app = FastAPI(lifespan=lifespan)
-origins = [
-    "http://localhost:9000",       
-    "http://127.0.0.1:9000",      
-    "https://your-game-domain.com"
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],          # Allows POST, GET, OPTIONS, etc.
-    allow_headers=["*"],
-)
-
 app.include_router(llm_router)
 app.include_router(game_router)
 
