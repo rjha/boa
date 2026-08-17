@@ -2,12 +2,16 @@ from pathlib import Path
 import logging 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi import APIRouter
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
+
+# Boa SDK
 from config import AppConfig
 from config import get_logger_config
 from .routers.llm import llm_router
 from .routers.game import game_router
+from .routers.hello import hello_router
+
 
 # noinspection PyUnusedLocal
 @asynccontextmanager
@@ -21,9 +25,13 @@ async def lifespan(boa_app: FastAPI):
     yield
     # shutdown events
 
+
 app = FastAPI(lifespan=lifespan)
-app.include_router(llm_router)
-app.include_router(game_router)
+main_router = APIRouter(prefix="/boa/v1")
+main_router.include_router(hello_router)
+main_router.include_router(llm_router)
+main_router.include_router(game_router)
+app.include_router(main_router)
 
 
 # Path(__file__).resolve().parent points to 'web/api'
@@ -32,16 +40,3 @@ WEB_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = WEB_DIR / "static"
 # Mount '/static' to serve web/static/index.html
 app.mount("/static", StaticFiles(directory=STATIC_DIR, html=True), name="static")
-
-@app.get("/hello")
-def write_hello_world():
-    return {"Hello": "World"}
-
-
-@app.get("/debug")
-def get_debug_info():
-    log_config = get_logger_config("global")
-    return {
-        "log_file": log_config.log_file,
-        "log_level": log_config.log_level
-    }
