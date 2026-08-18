@@ -1,9 +1,8 @@
-from pathlib import Path
 import logging 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi import APIRouter
-from fastapi.staticfiles import StaticFiles
+
 
 # Boa SDK
 from config import AppConfig
@@ -32,11 +31,3 @@ main_router.include_router(hello_router)
 main_router.include_router(llm_router)
 main_router.include_router(game_router)
 app.include_router(main_router)
-
-
-# Path(__file__).resolve().parent points to 'web/api'
-# .parent again points to 'web/'
-WEB_DIR = Path(__file__).resolve().parent.parent 
-STATIC_DIR = WEB_DIR / "static"
-# Mount '/static' to serve web/static/index.html
-app.mount("/static", StaticFiles(directory=STATIC_DIR, html=True), name="static")
