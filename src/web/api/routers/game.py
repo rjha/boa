@@ -4,6 +4,7 @@ from typing import List
 from typing import Dict, Any
 from core.user import start_web_session, update_word_tracker
 from core.user import save_game_state, get_game_state, reset_game_level
+from core.user import create_web_user, WebUser
 from core.service import BoaApiResponse
 
 
@@ -37,6 +38,12 @@ class NextWordsRequest(BaseModel):
     game_name: str = Field(..., min_length=1, description="Name of the active mini-game")
     game_level: int = Field(..., ge=0, description="Difficulty level, must be 0 or higher")
     batch_size: int = Field(..., gt=0, description="Number of unique words to fetch (> 0)")
+
+
+
+class CreateWebUserRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=64, description="Full name of the user")
+    login_name: str = Field(..., min_length=1, max_length=32, description="Unique login handle/username")
 
 
 
@@ -170,5 +177,37 @@ def reset_level_progress_endpoint(payload: ResetLevelRequest):
         message=f"Successfully reset level {payload.game_level}",
         data={
             "delete_count": deleted_count
+        }
+    )
+
+
+@game_router.post(
+    "/user/add",
+    response_model=BoaApiResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": BoaApiResponse, "description": "Bad Request - Validation error or duplicate username"},
+        422: {"model": BoaApiResponse, "description": "Unprocessable Entity - Missing payload fields"}
+    },
+    summary="Create a new web user",
+)
+def add_user_endpoint(payload: CreateWebUserRequest):
+    """
+    Creates a new web user with a unique name and login_name.
+    """
+
+    user_uuid = create_web_user(WebUser(
+        name=payload.name,
+        login_name=payload.login_name
+    ))
+
+    return BoaApiResponse(
+        status="success",
+        statusCode=status.HTTP_201_CREATED,
+        message="Web user created successfully.",
+        data={
+            "user_uuid": user_uuid,
+            "name": payload.name,
+            "login_name": payload.login_name
         }
     )
