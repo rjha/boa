@@ -94,6 +94,7 @@ def _store_word_tracker_batch(
               SELECT 1
               FROM word_tracker wt
               WHERE wt.session_uuid = %s
+              AND wt.game_name = %s
                 AND wt.token = hm.token
           )
         ORDER BY RANDOM()
@@ -107,7 +108,7 @@ def _store_word_tracker_batch(
     """
 
     with conn.cursor() as cur:
-        cur.execute(select_query, (w_level, session_uuid, batch_size))
+        cur.execute(select_query, (w_level, session_uuid, game_name, batch_size))
         rows = cur.fetchall()
         
         tokens = [row[0] for row in rows]
