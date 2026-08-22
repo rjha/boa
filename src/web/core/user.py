@@ -1,27 +1,27 @@
 import logging
 import json 
+import uuid
 from dataclasses import dataclass
-from uuid import UUID
 import psycopg
-from uuid import UUID
 from typing import List, Dict, Any, Optional
 from config import get_postgres_conn_string
 
 
+logger = logging.getLogger("main." + __name__)
 
 @dataclass(frozen=True)
 class WebUser:
     name: str
     login_name: str
-    user_uuid: Optional[UUID] = None
+    user_uuid: Optional[str] = None
 
 @dataclass(frozen=True)
 class WebSession:
-    user_uuid: UUID
-    session_uuid: Optional[UUID] = None
+    user_uuid: str
+    session_uuid: Optional[str] = None
 
 
-def _store_web_user(conn: psycopg.Connection, user: WebUser) -> UUID:
+def _store_web_user(conn: psycopg.Connection, user: WebUser) -> str:
     """Private database method to insert a new web user into PostgreSQL."""
     insert_query = """
         INSERT INTO web_user (name, login_name)
@@ -35,7 +35,7 @@ def _store_web_user(conn: psycopg.Connection, user: WebUser) -> UUID:
     return user_uuid
 
 
-def _get_user_uuid(conn: psycopg.Connection, login_name: str) -> Optional[UUID]:
+def _get_user_uuid(conn: psycopg.Connection, login_name: str) -> Optional[str]:
     select_query = """
         SELECT user_uuid 
         FROM web_user 
@@ -47,7 +47,7 @@ def _get_user_uuid(conn: psycopg.Connection, login_name: str) -> Optional[UUID]:
         return row[0] if row else None
 
 
-def _get_web_session(conn: psycopg.Connection, user_uuid: UUID) -> Optional[UUID]:
+def _get_web_session(conn: psycopg.Connection, user_uuid: str) -> Optional[str]:
     """ check if an existing session exists for user_uuid."""
     select_query = """
         SELECT session_uuid 
@@ -60,7 +60,7 @@ def _get_web_session(conn: psycopg.Connection, user_uuid: UUID) -> Optional[UUID
         return row[0] if row else None
 
 
-def _store_web_session(conn: psycopg.Connection, user_uuid: UUID) -> UUID:
+def _store_web_session(conn: psycopg.Connection, user_uuid: str) -> str:
     """insert a new session and return the generated session_uuid."""
     insert_query = """
         INSERT INTO web_session (user_uuid)
@@ -76,7 +76,7 @@ def _store_web_session(conn: psycopg.Connection, user_uuid: UUID) -> UUID:
 
 def _store_word_tracker_batch(
     conn: psycopg.Connection,
-    session_uuid: UUID,
+    session_uuid: str,
     game_name: str,
     w_level: int,
     batch_size: int,
@@ -122,7 +122,7 @@ def _store_word_tracker_batch(
 
         return tokens
     
-def _delete_web_session(conn: psycopg.Connection, session_uuid: UUID) -> bool:
+def _delete_web_session(conn: psycopg.Connection, session_uuid: str) -> bool:
     """
     Private DB helper to delete a session by session_uuid.
     Returns True if a row was deleted, False otherwise.
@@ -152,7 +152,7 @@ def _delete_web_sessions_by_login_name(conn: psycopg.Connection, login_name: str
         cur.execute(delete_query, (login_name,))
         return cur.rowcount
 
-def _session_exists(conn: psycopg.Connection, session_uuid: UUID) -> bool:
+def _session_exists(conn: psycopg.Connection, session_uuid: str) -> bool:
     select_query = """
         SELECT 1 
         FROM web_session 
@@ -165,7 +165,7 @@ def _session_exists(conn: psycopg.Connection, session_uuid: UUID) -> bool:
 
 def _upsert_game_state(
     conn: psycopg.Connection, 
-    session_uuid: UUID, 
+    session_uuid: str, 
     game_name: str, 
     game_data: Dict[str, Any]
 ) -> int:
@@ -189,7 +189,7 @@ def _upsert_game_state(
 
 def _fetch_game_state(
     conn: psycopg.Connection, 
-    session_uuid: UUID, 
+    session_uuid: str, 
     game_name: str
 ) -> Optional[Dict[str, Any]]:
     select_query = """
@@ -212,7 +212,7 @@ def _fetch_game_state(
 
 def _clear_word_tracker_rows(
     conn: psycopg.Connection,
-    session_uuid: UUID,
+    session_uuid: str,
     game_name: str,
     game_level: int
 ) -> int:
@@ -226,6 +226,25 @@ def _clear_word_tracker_rows(
         cur.execute(delete_query, (session_uuid, game_name, game_level))
         return cur.rowcount
 
+
+
+def _check_postgres_uuid(column_uuid: str) -> str:
+    """
+    Validates if a string is a valid UUID format.
+    Raises ValueError if invalid, otherwise returns the sanitized string.
+    """
+    if not column_uuid or not isinstance(column_uuid, str):
+        logger.error("Session UUID provided is empty or invalid type: %s", column_uuid)
+        raise ValueError("session_uuid must be a non-empty string.")
+
+    try:
+        # Strict validation check
+        uuid_obj = uuid.UUID(column_uuid.strip())
+        return str(uuid_obj)
+    except ValueError:
+        logger.error("Invalid UUID string format provided: %s", column_uuid)
+        raise ValueError(f"Invalid session_uuid format: {column_uuid}")
+    
     
 """
 # #################################
@@ -235,7 +254,7 @@ def _clear_word_tracker_rows(
 ###################################
 """
 
-def create_web_user(user: WebUser) -> UUID:
+def create_web_user(user: WebUser) -> str:
     """Business logic method to validate and create a web user."""
     logger = logging.getLogger("main." + __name__)
     
@@ -262,7 +281,7 @@ def create_web_user(user: WebUser) -> UUID:
     return user_uuid
 
 
-def start_web_session(login_name: str) -> UUID:
+def start_web_session(login_name: str) -> str:
     
     logger = logging.getLogger("main." + __name__)
     db_conn_string = get_postgres_conn_string()
@@ -297,7 +316,7 @@ def start_web_session(login_name: str) -> UUID:
 
 
 def update_word_tracker(
-        session_uuid: UUID, 
+        session_uuid: str, 
         game_name: str, 
         w_level: int, 
         batch_size: int) -> List[str]:
@@ -307,7 +326,9 @@ def update_word_tracker(
     """
     logger = logging.getLogger("main." + __name__)
 
-    # Validation logic
+    # INPUT Validation logic
+    _check_postgres_uuid(session_uuid)
+
     if not game_name or not game_name.strip():
         logger.error("Failed to update word tracker: 'game_name' is empty.")
         raise ValueError("Game name cannot be empty.")
@@ -367,11 +388,14 @@ def clear_session(login_name: str) -> int:
             raise e
 
 
-def save_game_state(session_uuid: UUID, game_name: str, game_data: Dict[str, Any]) -> int:
+def save_game_state(session_uuid: str, game_name: str, game_data: Dict[str, Any]) -> int:
     logger = logging.getLogger("main." + __name__)
     db_conn_string = get_postgres_conn_string()
     game_state_id = None
 
+    # INPUT VALIDATION
+    _check_postgres_uuid(session_uuid)
+    
     with psycopg.connect(db_conn_string) as conn:
         try:
             # 1. Verify that the session exists
@@ -384,6 +408,8 @@ def save_game_state(session_uuid: UUID, game_name: str, game_data: Dict[str, Any
             conn.commit()
             logger.info("Saved game state %s for session %s and game %s", game_state_id, session_uuid, game_name)
 
+        except ValueError:
+            raise
         except Exception as e:
             conn.rollback()
             logger.exception("Database error while saving game state for session: %s", session_uuid)
@@ -392,9 +418,12 @@ def save_game_state(session_uuid: UUID, game_name: str, game_data: Dict[str, Any
     return game_state_id
 
 
-def get_game_state(session_uuid: UUID, game_name: str) -> Optional[Dict[str, Any]]:
+def get_game_state(session_uuid: str, game_name: str) -> Optional[Dict[str, Any]]:
     logger = logging.getLogger("main." + __name__)
     db_conn_string = get_postgres_conn_string()
+
+    # INPUT VALIDATION
+    _check_postgres_uuid(session_uuid)
 
     with psycopg.connect(db_conn_string) as conn:
         try:
@@ -412,15 +441,21 @@ def get_game_state(session_uuid: UUID, game_name: str) -> Optional[Dict[str, Any
                 
             return record
 
+        except ValueError:
+            raise
+        
         except Exception as e:
             logger.exception("Database error while fetching game state for session %s", session_uuid)
             raise e
 
 
 
-def reset_game_level(session_uuid: UUID, game_name: str, game_level: int) -> int:
+def reset_game_level(session_uuid: str, game_name: str, game_level: int) -> int:
     logger = logging.getLogger("main." + __name__)
     db_conn_string = get_postgres_conn_string()
+
+    # INPUT VALIDATION
+    _check_postgres_uuid(session_uuid)
 
     with psycopg.connect(db_conn_string) as conn:
         try:
@@ -441,6 +476,9 @@ def reset_game_level(session_uuid: UUID, game_name: str, game_level: int) -> int
                 deleted_count,
             )
             return deleted_count
+        
+        except ValueError:
+            raise
 
         except Exception as e:
             logger.exception(
