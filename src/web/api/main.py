@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi import APIRouter
+from core.service import register_exception_handlers
 
 
 # Boa SDK
@@ -26,6 +27,10 @@ async def lifespan(boa_app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Register global exception handlers
+register_exception_handlers(app)
+
 main_router = APIRouter(prefix="/boa/v1")
 main_router.include_router(hello_router)
 main_router.include_router(llm_router)
