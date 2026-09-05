@@ -2,12 +2,12 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi import APIRouter
-from core.service import register_exception_handlers
+from softmaxx.api.service import register_exception_handlers
 
 
 # Boa SDK
-from config import AppConfig
-from config import get_logger_config
+from softmaxx.config import AppConfig
+from softmaxx.config import get_logger_config
 from .routers.llm import llm_router
 from .routers.game import game_router
 from .routers.hello import hello_router

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from config import get_logger_config
+from softmaxx.config import get_logger_config
 
 hello_router = APIRouter(
     prefix="/hello",

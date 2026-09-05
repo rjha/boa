@@ -1,11 +1,10 @@
 from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
-from typing import List
 from typing import Dict, Any
-from core.user import start_web_session, update_word_tracker
-from core.user import save_game_state, get_game_state, reset_game_level
-from core.user import create_web_user, WebUser
-from core.service import BoaApiResponse
+from softmaxx.game.user import start_web_session, update_word_tracker
+from softmaxx.game.user import save_game_state, get_game_state, reset_game_level
+from softmaxx.game.user import create_web_user, WebUser
+from softmaxx.api.service import BoaApiResponse
 
 
 game_router = APIRouter(

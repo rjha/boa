@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 import psycopg
 from typing import List, Dict, Any, Optional
-from config import get_postgres_conn_string
+from softmaxx.config import get_database_config, DatabaseConfig
 
 
 logger = logging.getLogger("main." + __name__)
@@ -267,9 +267,11 @@ def create_web_user(user: WebUser) -> str:
         logger.error("Failed to create web user: 'login_name' is empty.")
         raise ValueError("Login name cannot be empty.")
 
-    db_conn_string = get_postgres_conn_string()
+    
     user_uuid = None 
-    with psycopg.connect(db_conn_string) as conn:
+    db_config:DatabaseConfig = get_database_config()
+
+    with psycopg.connect(**db_config.get_map()) as conn:
         try:
             user_uuid = _store_web_user(conn, user)
             conn.commit()
@@ -284,10 +286,11 @@ def create_web_user(user: WebUser) -> str:
 def start_web_session(login_name: str) -> str:
     
     logger = logging.getLogger("main." + __name__)
-    db_conn_string = get_postgres_conn_string()
+    
     session_uuid = None
+    db_config:DatabaseConfig = get_database_config()
 
-    with psycopg.connect(db_conn_string) as conn:
+    with psycopg.connect(**db_config.get_map()) as conn:
         try:
             # 1. fetch user_uuid on login_name 
             user_uuid = _get_user_uuid(conn, login_name)
@@ -337,10 +340,10 @@ def update_word_tracker(
         logger.error("Failed to update word tracker: invalid batch_size %s", batch_size)
         raise ValueError("Batch size must be greater than zero.")
 
-    db_conn_string = get_postgres_conn_string()
     fetched_tokens: List[str] = []
+    db_config:DatabaseConfig = get_database_config()
 
-    with psycopg.connect(db_conn_string) as conn:
+    with psycopg.connect(**db_config.get_map()) as conn:
         try:
             fetched_tokens = _store_word_tracker_batch(
                 conn, session_uuid, game_name, w_level, batch_size
@@ -374,8 +377,9 @@ def clear_session(login_name: str) -> int:
         logger.error("Failed to clear session: 'login_name' is empty.")
         raise ValueError("Login name cannot be empty.")
 
-    db_conn_string = get_postgres_conn_string()
-    with psycopg.connect(db_conn_string) as conn:
+    db_config:DatabaseConfig = get_database_config()
+
+    with psycopg.connect(**db_config.get_map()) as conn:
         try:
             deleted_count = _delete_web_sessions_by_login_name(conn, login_name)
             conn.commit()
@@ -390,13 +394,13 @@ def clear_session(login_name: str) -> int:
 
 def save_game_state(session_uuid: str, game_name: str, game_data: Dict[str, Any]) -> int:
     logger = logging.getLogger("main." + __name__)
-    db_conn_string = get_postgres_conn_string()
-    game_state_id = None
 
+    game_state_id = None
     # INPUT VALIDATION
     _check_postgres_uuid(session_uuid)
-    
-    with psycopg.connect(db_conn_string) as conn:
+    db_config:DatabaseConfig = get_database_config()
+
+    with psycopg.connect(**db_config.get_map()) as conn:
         try:
             # 1. Verify that the session exists
             if not _session_exists(conn, session_uuid):
@@ -420,12 +424,12 @@ def save_game_state(session_uuid: str, game_name: str, game_data: Dict[str, Any]
 
 def get_game_state(session_uuid: str, game_name: str) -> Optional[Dict[str, Any]]:
     logger = logging.getLogger("main." + __name__)
-    db_conn_string = get_postgres_conn_string()
 
     # INPUT VALIDATION
     _check_postgres_uuid(session_uuid)
-
-    with psycopg.connect(db_conn_string) as conn:
+    db_config:DatabaseConfig = get_database_config()
+    
+    with psycopg.connect(**db_config.get_map()) as conn:
         try:
             # 1. Verify session exists
             if not _session_exists(conn, session_uuid):
@@ -452,12 +456,12 @@ def get_game_state(session_uuid: str, game_name: str) -> Optional[Dict[str, Any]
 
 def reset_game_level(session_uuid: str, game_name: str, game_level: int) -> int:
     logger = logging.getLogger("main." + __name__)
-    db_conn_string = get_postgres_conn_string()
-
+    
     # INPUT VALIDATION
     _check_postgres_uuid(session_uuid)
+    db_config:DatabaseConfig = get_database_config()
 
-    with psycopg.connect(db_conn_string) as conn:
+    with psycopg.connect(**db_config.get_map()) as conn:
         try:
             # 1. Verify session exists
             if not _session_exists(conn, session_uuid):
