@@ -1,9 +1,10 @@
-import os 
+from typing import AsyncGenerator, Optional
 import json
 import time 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI
+from softmaxx.config import AppConfig
 
 
 """
@@ -27,14 +28,25 @@ llm_router = APIRouter(
     responses={404: {"description": "LLM router not found"}},
 )
 
-client = AsyncOpenAI(
-    base_url="https://inference.do-ai.run/v1/",
-    api_key=os.getenv("QWEN3_32B_KEY"),
-    timeout=60.0,
-)
+
+# Global holder for client instance
+_client: Optional[AsyncOpenAI] = None
 
 
-async def event_generator(prompt: str):
+def get_llm_client() -> AsyncOpenAI:
+    """Dependency that lazily initializes and returns the AsyncOpenAI client."""
+    global _client
+    if _client is None:
+        api_keys = AppConfig.get("api_keys")
+        _client = AsyncOpenAI(
+            base_url="https://inference.do-ai.run/v1/",
+            api_key=api_keys["QWEN3_32B_KEY"],
+            timeout=60.0,
+        )
+    return _client
+
+
+async def event_generator(prompt: str, client: AsyncOpenAI) -> AsyncGenerator[str, None]:
     start_time = time.perf_counter()
     first_token_time = None
     token_count = 0
@@ -81,10 +93,13 @@ async def event_generator(prompt: str):
 
 
 @llm_router.post("/qwen3/chat")
-async def process_qwen3_chat(prompt: str = "Explain the Chaos theory."):
+async def process_qwen3_chat(
+    prompt: str = "Explain the Chaos theory.",
+    client: AsyncOpenAI = Depends(get_llm_client)):
+
     """Streams JSON SSE events live as tokens arrive."""
     return StreamingResponse(
-        event_generator(prompt),
+        event_generator(prompt, client),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
