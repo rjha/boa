@@ -1,0 +1,107 @@
+
+
+# ================================================
+# 
+# Add this content as file github.code-workspace and load it from inside vscode. 
+# The advantage is that You can control what all repositories appears inside the 
+# vscode workspace. 
+# 
+# ===============================================
+
+
+{
+    "folders": [
+        {
+            "name": "GITHUB ROOT",
+            "path": "."
+        },
+        {
+            "name": "AI-Training",
+            "path": "./ai-training"
+        },
+        {
+            "name": "www",
+            "path": "./www"
+        },
+        {
+            "name": "BOXGPT",
+            "path": "./boxgpt"
+        },
+        {
+            "name": "XBoa",
+            "path": "./boa"
+        },
+
+    ],
+    "settings": {
+        "files.exclude": {"boa": true,
+            "www": true,
+            "ai-training": true,
+            "boxgpt": true
+        }
+
+    }
+}
+
+
+
+# settings.json 
+# inside the repo folder, add a .vscode directory 
+# add settings.json to .vscode 
+
+{
+    "python-envs.pythonProjects": [
+        {
+            "path": ".",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ],
+    "python.defaultInterpreterPath": "/Users/rjha/sw/pyvm/scanpy/bin/python3",
+    "python.analysis.extraPaths": [
+        "/Users/rjha/sw/pyvm/boa-sdk/lib/python3.13/site-packages",
+        "/Users/rjha/code/github/xboa/src/lib"
+    ]
+}
+
+# for command line scripts 
+# set PYTHONPATH variable 
+$PYTHONPATH=/Users/rjha/code/github/xboa/src/lib/
+$export PYTHONPATH
+
+# The softmaxx library configuration module(softmaxx/config.py)
+# follows XDG naming conventions. XDG_CONFIG_HOME is $HOME/.config folder 
+$ cat ~/.config/softmaxx/xboa/config.json
+
+{
+    "database": {
+
+        "default": {
+            "user": "xapi_user",
+            "password": "xxxxxxxx",
+            "host": "localhost",
+            "port": 5432,
+            "database": "xapi_db"
+      }
+    },
+
+    "logging": {
+        "__doc" : "DEBUG:10, INFO:20, WARNING:30, ERROR:40, CRITICAL:50",
+        "fastapi": {
+            "log_file": "/tmp/xboa-fastapi.log",
+            "log_level": 20
+        },
+        "local": {
+            "log_file": "/tmp/xboa-local.log",
+            "log_level": 20
+
+        }
+    },
+    "api_keys": {
+       "QWEN3_32B_KEY": "xxxxxx"
+    }
+}
+
+
+# get list of virtual env modules using pip
+

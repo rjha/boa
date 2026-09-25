@@ -1,0 +1,56 @@
+
+# see documentation to connect to your postgres database 
+# in a docker container. The idea is that connect as a postgres or 
+# system user and create a user and make him owner of the database. 
+
+$ sudo apt install postgresql postgresql-contrib
+$ sudo -u postgres psql
+
+
+
+CREATE USER xapi_user WITH PASSWORD 'xxxx@bb';
+CREATE DATABASE xapi_db WITH OWNER = xapi_user;
+\q
+
+# Then quit and login as new user into target database 
+# In PostgreSQL, whoever creates a table or sequence 
+# automatically becomes its absolute owner. so we want to run 
+# schema scripts as the application user in target database. 
+
+Now connect to rags01_db as xapi_app and create objects. 
+$ psql -h 127.0.0.1 -U xapi_user -d xapi_db -p 5432
+
+# Run the schema scripts
+
+
+# sometimes we may need a READ ONLY USER 
+# This is true of worker scripts which only 
+# need to access data from this database and never write. 
+# 
+
+CREATE USER xapi_worker WITH PASSWORD 'worker_secure_password';
+
+-- 2. Allow the worker to establish a connection to the database
+GRANT CONNECT ON DATABASE my_vector_db TO xapi_worker;
+
+-- 3. Open the public schema door and grant access to existing tables
+GRANT USAGE ON SCHEMA public TO xapi_worker;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO xapi_worker;
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO xapi_worker;
+
+-- If you need to grant automatic write privileges to 
+-- newer objects. 
+-- 4. Secure future tables created by the active session
+ALTER DEFAULT PRIVILEGES IN SCHEMA public 
+    GRANT SELECT ON TABLES TO xapi_worker;
+ALTER DEFAULT PRIVILEGES FOR ROLE xapi_admin IN SCHEMA public 
+    GRANT SELECT ON TABLES TO xapi_worker;
+
+
+- create game schema 
+- load data using words.py 
+
+
+
+
+

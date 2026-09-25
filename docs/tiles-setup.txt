@@ -1,0 +1,9 @@
+
+
+# checkout code from github rjha/xboa repository 
+# setup vscode to load this repository (see vscode-setup.txt)
+# create postgres database and a user for application (xapi_db and xapi_user)
+# run misc/postgres/tile-schema.sql as xapi_user 
+# create xboa config file 
+# for command line scripts, do not forget to set PYTHONPATH 
+# 
