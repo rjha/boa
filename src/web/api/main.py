@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from softmaxx.api.service import register_exception_handlers
 
 
-# Boa SDK
+# XBOA SDK
 from softmaxx.config import AppConfig
 from softmaxx.config import get_logger_config
 from .routers.llm import llm_router
@@ -16,9 +16,9 @@ from .routers.hello import hello_router
 # noinspection PyUnusedLocal
 @asynccontextmanager
 async def lifespan(boa_app: FastAPI):
-    logger = logging.getLogger("boa.fastapi.main." + __name__)
+    logger = logging.getLogger("xboa.fastapi.main." + __name__)
     AppConfig.load()
-    log_config = get_logger_config("global")
+    log_config = get_logger_config("fastapi")
     log_file_name = log_config.log_file
     AppConfig.init_logging(log_file=log_file_name, log_level=log_config.log_level)
     logger.info(f"fastapi main app started...")
